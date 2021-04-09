@@ -3,7 +3,7 @@ This is the PyTorch implementation for our **MS-DeJoR**
 
 ## Network Architecture
 The architecture of our proposed MS-DeJoC model is as follows
-
+<img src="architecture.png" width="100%" />
 
 ## Setups
  - **Environment**
