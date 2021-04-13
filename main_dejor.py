@@ -164,8 +164,8 @@ def train(nb_epoch, batch_size, store_name, start_epoch=0):
                 inputs, targets = inputs.cuda(), targets.cuda()
             inputs, targets = Variable(inputs), Variable(targets)
 
-            output_1 = netp1(inputs)
-            output_2 = netp2(inputs)
+            output_1 = net1(inputs)
+            output_2 = net2(inputs)
 
             loss = CoLoss(output_1,output_2, targets, epoch)                 #   (self, logits, targets, index, epoch, layer_number)
             optimizer.zero_grad()
