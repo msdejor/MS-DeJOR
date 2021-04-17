@@ -1,5 +1,5 @@
 
-This is the PyTorch implementation for our **MS-DeJoR**
+This is the PyTorch implementation for our **MS-DeJoR: A Hybrid Approach for Webly-supervised Fine-Grained Visual Classification**
 
 ## Network Architecture
 The architecture of our proposed MS-DeJoC model is as follows
@@ -34,13 +34,13 @@ The architecture of our proposed MS-DeJoC model is as follows
   ```
 
 ## Running
-If you want to use multi-scale module,  modify the corresponding parameters in `main_msdejor.py`, such as `--bs`, `--net`, `--data`, `--gpu`, etc. You can also directly run `main_msdejor.py` to get the final result.
+If you want to use multi-scale module,  modify the corresponding parameters in `main_msdejor.py`, such as `--bs`, `--net`, `--data`, `--gpu`, etc. You can also directly run `main_msdejor.py` to get the final result. We provide the default parameter setting as following：
 
 ```python
 python main_msdejor.py --bs 32 --net 18 --data bird --lamb 0.1 --gama 2
 ```
 
-If you only prefer theDeJoR module,  run `main_dejor.py`.
+If you only prefer the DeJoR module,  run `main_dejor.py`.
 
 ```python
 python main_dejor.py --bs 64 --net 18 --data bird --lamb 0.1 --gama 2
