@@ -1,6 +1,6 @@
 # MS-DeJoR: A Hybrid Approach for Webly-supervised Fine-Grained Visual Classification
 ## Introduction
-This is the PyTorch implementation for our **MS-DeJoR: A Hybrid Approach for Webly-supervised Fine-Grained Visual Classification**
+This is the PyTorch implementation for our paper: **MS-DeJoR: A Hybrid Approach for Webly-supervised Fine-Grained Visual Classification**
 
 ## Network Architecture
 The architecture of our proposed MS-DeJoC model is as follows
