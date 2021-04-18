@@ -34,7 +34,7 @@ Download these web fine-grained datasets, namely [Web-CUB](https://wsnfg-sh.oss-
          └── tval
   ```
 
-## Running
+## Training
 - If you want to use multi-scale module,  modify the corresponding parameters in `main_msdejor.py` or directly run `main_msdejor.py` to get the final result. We provide the default parameter settings as following：
 
 ```python
