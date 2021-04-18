@@ -7,7 +7,7 @@ The architecture of our proposed approach is as follows
 <img src="architecture.png" width="100%" />
 
 
-##Environment
+## Environment
 Create a virtual environment with python 3.7,
 
     `$ conda create -n msdejor_env python=3.7`
@@ -18,7 +18,7 @@ Create a virtual environment with python 3.7,
 
    `$ pip install -r requirements.txt` 
 
-##Data Preparation
+## Data Preparation
     Download these web fine-grained datasets, namely [Web-CUB](https://wsnfg-sh.oss-cn-shanghai.aliyuncs.com/web-bird.tar.gz), [Web-Car](https://wsnfg-sh.oss-cn-shanghai.aliyuncs.com/web-car.tar.gz) and [Web-Aircraft](https://wsnfg-sh.oss-cn-shanghai.aliyuncs.com/web-aircraft.tar.gz). Then uncompress them into `./data` directory.
 
   ```
