@@ -22,16 +22,16 @@ Create a virtual environment with python 3.7,
 Download these web fine-grained datasets, namely [Web-CUB](https://wsnfg-sh.oss-cn-shanghai.aliyuncs.com/web-bird.tar.gz), [Web-Car](https://wsnfg-sh.oss-cn-shanghai.aliyuncs.com/web-car.tar.gz) and [Web-Aircraft](https://wsnfg-sh.oss-cn-shanghai.aliyuncs.com/web-aircraft.tar.gz). Then uncompress them into `./data` directory.
 
   ```
-  data
-  ├── web-bird
-  │   ├── train
-  │   └── val
-  ├── web-car
-  │   ├── train
-  │   └── val
-  └── web-aircraft
-      ├── train
-      └── tval
+  ---data
+     ├── web-bird
+     │   ├── train
+     │   └── val
+     ├── web-car
+     │   ├── train
+     │   └── val
+     └── web-aircraft
+         ├── train
+         └── tval
   ```
 
 ## Running
