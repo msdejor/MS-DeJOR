@@ -46,7 +46,8 @@ python main_msdejor.py --bs 30 --net 50 --data bird --lamb 0.1 --gama 2
 ```python
 python main_dejor.py --bs 50 --net 18 --data bird --lamb 0.1 --gama 2
 ```
-In our experiments, we adopt the same hyperparameters across three benchmark datasets, setting ![](https://latex.codecogs.com/svg.image?&space;\lambda) to 0.1 and ![](https://latex.codecogs.com/svg.image?\gamma&space;) to 2. The final experimental results are shown in the following table：
+In our experiments, we adopt the same hyperparameters across three benchmark datasets, setting ![](https://latex.codecogs.com/svg.image?&space;\lambda) to 0.1 and ![](https://latex.codecogs.com/svg.image?\gamma&space;) to 2. 
+- The final experimental results are shown in the following table：
 <img src="results.png" width="100%" />
 
 
