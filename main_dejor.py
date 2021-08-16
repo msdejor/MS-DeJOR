@@ -9,9 +9,13 @@ import logging
 import random
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import math
 import torch.optim as optim
 import torch.backends.cudnn as cudnn
+import torchvision
+from torchvision import transforms
+from torch.autograd import Variable
 
 from utils import *
 import time
@@ -23,17 +27,21 @@ from Imagefolder_modified import Imagefolder_modified
 import warnings
 warnings.filterwarnings('ignore')
 
-parser = argparse.ArgumentParser(description='DeJoR')
+parser = argparse.ArgumentParser(description='DeJOR')
+parser.add_argument('--epochs',  type=int, default=100, help='total_epochs')
+parser.add_argument('--each_class',  default=None, type=int,help='each class samples')
 parser.add_argument('--bs',  type=int, default=50,help='batch_size')
 parser.add_argument('--lr', type=float, default=0.01)
-parser.add_argument('--net',  type=int, default=18,choices=[18,50],help='resnet18 or 50')
+parser.add_argument('--net',  type=int, default=18,choices=[18,50,16],help='resnet18 or resnet50 or vgg16')
 parser.add_argument('--data',  type=str, default='bird',help='dataset')
 parser.add_argument('--gama',  type=float, default=2,help='coefficient of negative entropy term : gama')
 parser.add_argument('--lamb', type=float, default=0.1, help ='coefficient of SCE : lambda')
 parser.add_argument('--gpu', default='3', type=str, help='gpu_th')
 parser.add_argument('--gpus', default=None, type=int, help='number of used gpu cards')
-parser.add_argument('--save_dir',  type=str, default='bird' ,help='save dir')
-
+parser.add_argument('--save_dir',  type=str, default='' ,help='save dir')
+parser.add_argument("--es", default=25, help="the start epoch to refurbish ", type=int)
+parser.add_argument("--num_workers", default=4, type=int, help='the number of workers')
+parser.add_argument("--mom", default=0.9, help="momentum", type=float)
 
 args = parser.parse_args()
 gpu = args.gpu
@@ -45,36 +53,51 @@ args.save_dir = args.data + '{:.2f}'.format(args.gama) + '_net_{}'.format(args.n
 class DejorLoss(nn.Module):
     r"""
     """
-    def __init__(self, Tepoch =10, drop_rate = 0.25, class_num=200):
+    def __init__(self, labels_all, Tepoch =10, drop_rate = 0.25, class_num=200,momentum=0.9,es=25):
         super(DejorLoss, self).__init__()
         self.Tepoch = Tepoch
         self.drop_rate = drop_rate
         self.class_num = class_num
+        self.soft_labels = torch.zeros(labels_all.shape[0], class_num, dtype=torch.float).cuda(non_blocking=True)
+        self.soft_labels[torch.arange(labels_all.shape[0]), labels_all] = 1
+        self.soft_labels = self.soft_labels.cuda()
+        self.momentum = momentum
+        self.es = es
 
+    def forward(self, logits_1, logits_2,labels, epoch,index):
 
-    def forward(self, logits_1, logits_2,labels, epoch):
-
-        loss_sum, H = self.loss_sum_calculate(logits_1,logits_2,labels)
+        loss_sum, H, js = self.loss_sum_calculate(logits_1,logits_2,labels,epoch,index)
 
         ind_sorted = torch.argsort(loss_sum.data)  # (N) sorted index of the loss
         forget_rate = min(epoch, self.Tepoch)/self.Tepoch * self.drop_rate
         num_remember = math.ceil((1 - forget_rate) * logits_1.shape[0])
         ind_update = ind_sorted[:num_remember]  # select the first num_remember low-loss instances
 
-        return loss_sum[ind_update].mean() - args.gama * H.mean()
+        w = (1-js).detach()
+        w *= w.shape[0]/w.sum()
+        return (w*loss_sum)[ind_update].mean() - args.gama *(w*H).mean()
 
-    def loss_sum_calculate(self,logits_1,logits_2,labels):
+    def loss_sum_calculate(self,logits_1,logits_2,labels, epoch, index):
         softmax1 = F.softmax(logits_1, dim=1)
         softmax2 = F.softmax(logits_2, dim=1)
-        loss_1 = F.cross_entropy(logits_1, labels, reduction='none')  # (N) loss per instance in this batch
-        loss_2 = F.cross_entropy(logits_2, labels, reduction='none')
-        RCE = torch.sum(-torch.log(softmax1 + 1e-7) * softmax2, dim=-1) + \
-              torch.sum(-torch.log(softmax2 + 1e-7) * softmax1, dim=-1)
-        H = torch.sum(-torch.log(softmax1+ 1e-7) * softmax1, dim=-1) + \
-              torch.sum(-torch.log(softmax2+ 1e-7) * softmax2, dim=-1)
-        loss_sum = (1-args.lamb) * loss_1 + (1-args.lamb) * loss_2 + args.lamb * RCE         #  lambda=0.1
+        M = (softmax1+softmax2)/2.
+        if epoch<self.es:
+            loss_1 = F.cross_entropy(logits_1, labels, reduction='none')  # (N) loss per instance in this batch
+            loss_2 = F.cross_entropy(logits_2, labels, reduction='none')
+        else:
+            logits = logits_1 + logits_2 
+            prob = F.softmax(logits.detach(), dim=1)
+            self.soft_labels[index] =  self.momentum * self.soft_labels[index] + (1 - self.momentum)* prob
+            loss_1 = torch.sum(-F.log_softmax(logits_1, dim=1) * self.soft_labels[index], dim=1)
+            loss_2 = torch.sum(-F.log_softmax(logits_2, dim=1) * self.soft_labels[index], dim=1)
 
-        return loss_sum, H
+        skl = F.kl_div(softmax1.log(), softmax2, reduction='none').sum(1)  + F.kl_div(softmax2.log(), softmax1, reduction='none').sum(1) 
+        H = torch.sum(-torch.log(softmax1 + 1e-7) * softmax1, dim=-1) + \
+              torch.sum(-torch.log(softmax2 + 1e-7) * softmax2, dim=-1)
+        js = F.kl_div(M.log(), softmax2, reduction='none').sum(1)  + F.kl_div(M.log(), softmax1, reduction='none').sum(1) 
+        sloss_sum = (1-args.lamb) * loss_1 + (1-args.lamb) * loss_2 + args.lamb * skl         #  lambda=0.1
+
+        return sloss_sum, H,  js
 
 
 def train(nb_epoch, batch_size, store_name, start_epoch=0):
@@ -98,8 +121,8 @@ def train(nb_epoch, batch_size, store_name, start_epoch=0):
         transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])
     ])
 
-    trainset = Imagefolder_modified(root='./data/web-{}/train'.format(args.data), transform=transform_train)
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=4,drop_last=True)
+    trainset = Imagefolder_modified(root='./data/web-{}/train'.format(args.data), transform=transform_train, number= args.each_class)
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=args.num_workers,drop_last=True)
     print('train image number is ', len(trainset))
     transform_test = transforms.Compose([
         transforms.Scale((550, 550)),
@@ -107,14 +130,14 @@ def train(nb_epoch, batch_size, store_name, start_epoch=0):
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
-    testset = torchvision.datasets.ImageFolder(root='./data/web-{}/val'.format(args.data), transform=transform_test)
-    testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size, shuffle=True, num_workers=4,drop_last=True)
+    testset = Imagefolder_modified(root='./data/web-{}/val'.format(args.data), transform=transform_test, number= args.each_class)
+    testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size, shuffle=False, num_workers=args.num_workers,drop_last=False)
     print('val image number is ', len(testset))
 
     # Model
 
-    net1 = load_resnet_layer(model_name=args.net, classes_nums = len(trainset.classes), pretrain=True, require_grad=True)
-    net2 = load_resnet_layer(model_name=args.net, classes_nums =len(trainset.classes),pretrain=True, require_grad=True)
+    net1 = load_layer(model_name=args.net, classes_nums = len(trainset.classes), pretrain=True, require_grad=True)
+    net2 = load_layer(model_name=args.net, classes_nums =len(trainset.classes),pretrain=True, require_grad=True)
     if args.gpus > 1:
         net1 = torch.nn.DataParallel(net1)
         net2 = torch.nn.DataParallel(net2)
@@ -124,7 +147,7 @@ def train(nb_epoch, batch_size, store_name, start_epoch=0):
     net2.cuda()
 
     # CELoss = nn.CrossEntropyLoss()
-    CoLoss = DejorLoss(class_num=len(trainset.classes))
+    CoLoss = DejorLoss(labels_all=torch.LongTensor(trainset.targets), Tepoch =10, drop_rate = 0.25, class_num=len(trainset.classes),momentum=args.mom,es = args.es)
     if args.gpus > 1:
         optimizer = optim.SGD([
             {'params': net1.module.parameters(), 'lr': args.lr},
@@ -167,7 +190,7 @@ def train(nb_epoch, batch_size, store_name, start_epoch=0):
             output_1 = net1(inputs)
             output_2 = net2(inputs)
 
-            loss = CoLoss(output_1,output_2, targets, epoch)                 #   (self, logits, targets, index, epoch, layer_number)
+            loss = CoLoss(output_1,output_2, targets, epoch, index)                 #   (self, logits, targets, index, epoch, layer_number)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -194,7 +217,7 @@ def train(nb_epoch, batch_size, store_name, start_epoch=0):
             idx = 0
 
             with torch.no_grad():
-                for idx, (inputs, targets) in enumerate(testloader):
+                for idx, (inputs, targets, _) in enumerate(testloader):
                     if use_cuda:
                         inputs, targets = inputs.cuda(), targets.cuda()
                     output_1 = net1(inputs)
@@ -244,7 +267,7 @@ def train(nb_epoch, batch_size, store_name, start_epoch=0):
         file.write('best val acc: {}(bet) {}(comb), com epoch {}, lambda {} gama{:.1f} bs {}'.format(max_val_acc_bet, max_val_acc_com, max_com_epoch,args.lamb,args.gama,args.bs))
 
 start_time = time.time()
-train(nb_epoch=100,             # number of epoch
+train(nb_epoch=args.epochs,             # number of epoch
          batch_size=args.bs,#110,         # batch size
          store_name=args.save_dir,     # folder for output
          start_epoch=0,         # the start epoch number when you resume the training
@@ -252,5 +275,3 @@ train(nb_epoch=100,             # number of epoch
 
 print('--------------------------------------------')
 print('total time: {}h'.format((time.time()-start_time)//3600))
-
-
