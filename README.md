@@ -1,6 +1,6 @@
-# MS-DeJoR: A Hybrid Approach for Webly-supervised Fine-Grained Visual Classification
+# Robust Learning from Noisy Web Data for Fine-Grained Recognition
 ## Introduction
-This is the PyTorch implementation for our paper **MS-DeJoR: A Hybrid Approach for Webly-supervised Fine-Grained Visual Classification**
+This is the PyTorch implementation for our paper **Robust Learning from Noisy Web Data for Fine-Grained Recognition**
 
 ## Network Architecture
 The architecture of our proposed approach is as follows
