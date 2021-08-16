@@ -110,9 +110,12 @@ class DatasetFolder(VisionDataset):
         self.class_to_idx = class_to_idx
         self.samples = samples
         self.targets = [s[1] for s in samples]
-
+        dict = {}
+        for key in self.targets:
+            dict[key] = dict.get(key, 0) + 1
+        
         print('--------------------------------')
-        print('preparing dataset')
+
         if number != None:
             print('Using part of images, number of each class: ',number)
         else:
@@ -127,6 +130,8 @@ class DatasetFolder(VisionDataset):
                     sys.stdout.flush()
                 # image = self.loader(path)
                 self.images.append(self.loader(path))
+        print(os.path.basename(os.path.normpath(root)),'image number is ',self.__len__(),end=';\t')
+        print('each class:',min(dict.values()),'-',max(dict.values()))
         print('--------------------------------')
 
     def _find_classes(self, dir):
