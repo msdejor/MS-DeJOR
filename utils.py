@@ -4,13 +4,15 @@ import torch
 import torchvision
 from torch.autograd import Variable
 from torchvision import transforms, models
+import torch.nn as nn
 import torch.nn.functional as F
 
-from Resnet import resnet18, resnet50
+from Resnet import resnet18, resnet50    # multi-layer output
 from Vgg import VGG16
-from ms_layer import MS_resnet_layer, MS_vgg16_layer
+from ms_layer import MS_resnet_layer, MS_vgg16_layer    # add external  classifier
 
-from resnet_origine import ResNet_Origine
+from resnet_origin import ResNet_Origin
+from Vgg_origin import VGG16_Origin
 from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -48,6 +50,36 @@ class AverageMeter(object):
         self.count += n
         self.avg = self.sum / self.count
 
+class SortMean(object):
+    def __init__(self, num_batch):
+        self.reset(num_batch)
+    
+    def reset(self,num_batch):
+        self.rate_list = []
+        self.num = num_batch
+        self.avg = 0
+
+    def update(self,val):
+        if len(self.rate_list)<self.num:
+            self.rate_list.append(val)
+        else:  
+            self.rate_list.append(val)
+            self.rate_list.pop(0)
+        self.avg = np.mean(self.rate_list)
+
+class SortMove(object):
+    def __init__(self, weight=0.9):
+        self.reset(weight)
+        
+    def reset(self,weight):
+        self.avg = 0
+        self.weight = weight
+        self.flag = False
+
+    def update(self,val):
+        if self.flag:
+            self.avg = self.weight*self.avg + (1-self.weight)*val
+        else: self.avg = val
 
 def cosine_anneal_schedule(t, nb_epoch, lr):
     cos_inner = np.pi * (t % (nb_epoch))  # t - 1 is used when t has 1-based indexing.
@@ -60,7 +92,7 @@ def cosine_anneal_schedule(t, nb_epoch, lr):
 
 def load_ms_layer(model_name,classes_nums, pretrain=True, require_grad=True):
     '''
-        MS-DeJoR
+        MS-DeJOR
     '''
     print('==> Building model..')
     if model_name == 'resnet50_ms':
@@ -81,17 +113,14 @@ def load_ms_layer(model_name,classes_nums, pretrain=True, require_grad=True):
 
     return net
 
-def load_resnet_layer(model_name, classes_nums,pretrain=True, require_grad=True):
+def load_layer(model_name, classes_nums,pretrain=True, require_grad=True):
     '''
-        DeJoR
+        DeJOR
     '''
-    net = ResNet_Origine(model_name,n_classes = classes_nums,pretrained=pretrain)
+    if model_name == 18 or model_name ==50:
+        net = ResNet_Origin(model_name,n_classes = classes_nums,pretrained=pretrain)
+    elif model_name ==16:
+        net = VGG16_Origin(n_classes = classes_nums,pretrained=pretrain)
     for param in net.parameters():
         param.requires_grad = require_grad
     return net
-
-
-
-
-
-
