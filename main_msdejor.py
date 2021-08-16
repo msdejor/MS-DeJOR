@@ -133,8 +133,8 @@ def train(nb_epoch, batch_size, store_name, start_epoch=0):
         transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])
     ])
 
-    trainset = Imagefolder_modified(root='./data/web-{}/train'.format(args.data), transform=transform_train)
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=4,drop_last=True)
+    trainset = Imagefolder_modified(root='./data/web-{}/train'.format(args.data), transform=transform_train, number= args.each_class)
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=args.num_workers,drop_last=True)
     print('train image number is ', len(trainset))
     transform_test = transforms.Compose([
         transforms.Scale((550, 550)),
@@ -142,8 +142,8 @@ def train(nb_epoch, batch_size, store_name, start_epoch=0):
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
-    testset = torchvision.datasets.ImageFolder(root='./data/web-{}/val'.format(args.data), transform=transform_test)
-    testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size, shuffle=True, num_workers=4,drop_last=True)
+    testset = Imagefolder_modified(root='./data/web-{}/val'.format(args.data), transform=transform_test, number= args.each_class)
+    testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size, shuffle=False, num_workers=args.num_workers,drop_last=False)
     print('val image number is ', len(testset))
 
     # Model
@@ -280,7 +280,7 @@ def train(nb_epoch, batch_size, store_name, start_epoch=0):
             idx = 0
 
             with torch.no_grad():
-                for batch_idx, (inputs, targets) in enumerate(testloader):
+                for batch_idx, (inputs, targets, _) in enumerate(testloader):
                     idx = batch_idx
                     if use_cuda:
                         inputs, targets = inputs.cuda(), targets.cuda()
